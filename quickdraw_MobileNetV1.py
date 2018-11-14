@@ -1,6 +1,6 @@
 
 
-#%%
+#%% First import the modules needed
 %matplotlib inline
 from IPython.core.interactiveshell import InteractiveShell
 InteractiveShell.ast_node_interactivity = "all"
@@ -28,7 +28,7 @@ start = dt.datetime.now()
 
 
 
-#%%
+#%% initialize some parameters and define functions to read in the files
 DP_DIR = '../input/shuffle-csvs/'
 INPUT_DIR = '../input/quickdraw-doodle-recognition/'
 
@@ -76,19 +76,19 @@ def top_3_accuracy(y_true, y_pred):
     return top_k_categorical_accuracy(y_true, y_pred, k=3)
 
 
-#%%
+#%% 
 STEPS = 1000
 EPOCHS = 16
 size = 80
 batchsize = 1000
 
-#%%
+#%% We use the MobileNetV1 model which is delivered in Keras with weight random initialization. 
 model = MobileNet(input_shape=(size, size, 1), alpha=1., weights=None, classes=NCATS)
 model.compile(optimizer=Adam(lr=0.002), loss='categorical_crossentropy',
               metrics=[categorical_crossentropy, categorical_accuracy, top_3_accuracy])
 print(model.summary())
 
-#%%
+#%% functions to transform strok-based image to pixel-based image using Open CV2
 def draw_cv2(raw_strokes, size=256, lw=6, time_color=True):
     img = np.zeros((BASE_SIZE, BASE_SIZE), np.uint8)
     for t, stroke in enumerate(raw_strokes):
@@ -124,7 +124,7 @@ def df_to_image_array_xd(df, size, lw=6, time_color=True):
     return x
 
 
-#%%
+#%% read in the validation dataset prepared using the 'shuffle-csvs' kernel on Kaggle
 valid_df = pd.read_csv(os.path.join(DP_DIR, 'train_k{}.csv.gz'.format(NCSVS - 1)), nrows=34000)
 x_valid = df_to_image_array_xd(valid_df, size)
 y_valid = keras.utils.to_categorical(valid_df.y, num_classes=NCATS)
@@ -132,10 +132,10 @@ print(x_valid.shape, y_valid.shape)
 print('Validation array memory {:.2f} GB'.format(x_valid.nbytes / 1024.**3 ))
 
 
-#%%
+#%% data generator
 train_datagen = image_generator_xd(size=size, batchsize=batchsize, ks=range(NCSVS - 1))
 
-#%%
+#%% show some of the doodle drawings
 x, y = next(train_datagen)
 n = 8
 fig, axs = plt.subplots(nrows=n, ncols=n, sharex=True, sharey=True, figsize=(12, 12))
@@ -148,7 +148,7 @@ plt.tight_layout()
 fig.savefig('gs.png', dpi=300)
 plt.show();
 
-#%%
+#%% define callbacks an train the model
 callbacks = [
     ReduceLROnPlateau(monitor='val_categorical_accuracy', factor=0.5, patience=5,
                       min_delta=0.005, mode='max', cooldown=3, verbose=1)
@@ -161,7 +161,7 @@ hist = model.fit_generator(
 )
 hists.append(hist)
 
-#%%
+#%% plots the accuracy and losses
 hist_df = pd.concat([pd.DataFrame(hist.history) for hist in hists], sort=True)
 hist_df.index = np.arange(1, len(hist_df)+1)
 fig, axs = plt.subplots(nrows=2, sharex=True, figsize=(16, 10))
@@ -181,14 +181,14 @@ fig.savefig('hist.png', dpi=300)
 plt.show();
 
 
-#%%
+#%% 
 test = pd.read_csv(os.path.join(INPUT_DIR, 'test_simplified.csv'))
 test.head()
 x_test = df_to_image_array_xd(test, size)
 print(test.shape, x_test.shape)
 print('Test array memory {:.2f} GB'.format(x_test.nbytes / 1024.**3 ))
 
-#%%
+#%% make prediction using the trained model
 test_predictions = model.predict(x_test, batch_size=128, verbose=1)
 
 top3 = preds2catids(test_predictions)
@@ -201,7 +201,7 @@ top3cats = top3.replace(id2cat)
 top3cats.head()
 top3cats.shape
 
-#%%
+#%% prepare for submission csv file
 test['word'] = top3cats['a'] + ' ' + top3cats['b'] + ' ' + top3cats['c']
 submission = test[['key_id', 'word']]
 submission.to_csv('gs_mn_submission_{}.csv'.format(int(map3 * 10**4)), index=False)
